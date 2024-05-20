@@ -1,7 +1,7 @@
-package http;
+package unit.http;
 
 import dev.spence.http.HttpDecoder;
-import dev.spence.http.HttpMethod;
+import dev.spence.pojos.HttpMethod;
 import dev.spence.pojos.HttpRequest;
 import org.junit.jupiter.api.Test;
 

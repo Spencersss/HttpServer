@@ -1,7 +1,6 @@
 package dev.spence.server;
 
 import dev.spence.http.HttpHandler;
-import dev.spence.Log;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -34,7 +33,8 @@ public class HttpServer {
     public void start() throws IOException {
         httpHandler = new HttpHandler(routes);
 
-        Log.LOGGER.info(String.format("HTTP Server Started on %s:%o", socket.getInetAddress().getHostAddress(), socket.getLocalPort()));
+        Logging.LOGGER.info(String.format("HTTP Server Started on %s:%o",
+                socket.getInetAddress().getHostAddress(), socket.getLocalPort()));
 
         try {
             // Continue to accept requests until our thread pool is shutdown entirely

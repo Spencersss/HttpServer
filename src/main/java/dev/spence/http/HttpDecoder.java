@@ -1,6 +1,8 @@
 package dev.spence.http;
 
+import dev.spence.pojos.HttpMethod;
 import dev.spence.pojos.HttpRequest;
+import dev.spence.pojos.HttpRequestBody;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,9 +12,10 @@ import java.util.*;
 
 public class HttpDecoder {
 
+    // Converts and maps byte stream data of http request to HttpRequest object and relevant fields
     public static Optional<HttpRequest> decode(InputStream inputStream) throws IOException {
         // Convert input stream of bytes to buffered stream of characters to read line-by-line
-        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream), inputStream.available());
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 
         // Retrieve http details including http method, uri, and http protocol used
         String rawRequest = reader.readLine();
@@ -27,12 +30,10 @@ public class HttpDecoder {
             headers.put(splitHeader[0], splitHeader[1].trim());
         }
 
-        // Retrieve body
-        StringBuilder body = new StringBuilder();
-        String currentBody;
-        while ((currentBody = reader.readLine()) != null) {
-            body.append(currentBody);
-        }
+        // Retrieve body of request
+        char[] bodyBuffer = new char[528];
+        int charsRead = reader.read(bodyBuffer);
+        HttpRequestBody body = new HttpRequestBody(String.valueOf(bodyBuffer));
 
         // Create request pojo and populate values
         HttpMethod httpMethod;
@@ -41,7 +42,15 @@ public class HttpDecoder {
         } catch (IllegalArgumentException e) {
             httpMethod = HttpMethod.UNKNOWN;
         }
-        HttpRequest request = new HttpRequest(httpMethod, httpDetails[1], httpDetails[2], headers);
+
+        HttpRequest request = HttpRequest.builder()
+                .method(httpMethod)
+                .uri(httpDetails[1])
+                .protocol(httpDetails[2])
+                .headers(headers)
+                .body(body)
+                .build();
+
         return Optional.of(request);
     }
 

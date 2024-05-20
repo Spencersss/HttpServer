@@ -24,8 +24,6 @@ public class HttpHandler {
 
         // Decode request and map to HttpRequest pojo
         Optional<HttpRequest> request = HttpDecoder.decode(inputStream);
-
-
     }
 
 }

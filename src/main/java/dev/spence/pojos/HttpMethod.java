@@ -1,4 +1,4 @@
-package dev.spence.http;
+package dev.spence.pojos;
 
 public enum HttpMethod {
     GET,
