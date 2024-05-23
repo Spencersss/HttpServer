@@ -1,5 +1,6 @@
-package dev.spence.pojos;
+package dev.spence.http.request;
 
+import dev.spence.pojos.HttpMethod;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

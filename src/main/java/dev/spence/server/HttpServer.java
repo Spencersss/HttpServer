@@ -1,6 +1,8 @@
 package dev.spence.server;
 
 import dev.spence.http.HttpHandler;
+import dev.spence.http.HttpRouteHandler;
+import dev.spence.http.request.HttpRequest;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -13,7 +15,7 @@ import java.util.concurrent.Executors;
 public class HttpServer {
 
     // Vars
-    private final Map<String, Runnable> routes = new HashMap<>();
+    private final Map<String, HttpRouteHandler<HttpRequest>> routes = new HashMap<>();
     private final ExecutorService executor;
     private final ServerSocket socket;
     private HttpHandler httpHandler;

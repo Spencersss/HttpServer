@@ -22,6 +22,9 @@ dependencies {
     // Mockito
     testImplementation("org.mockito:mockito-core:3.+")
 
+    // Jackson
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
+
     // Slf4j
     implementation("org.slf4j:slf4j-api:2.0.7")
     implementation("org.slf4j:slf4j-simple:2.0.7")

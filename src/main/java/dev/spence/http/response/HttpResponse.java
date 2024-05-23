@@ -1,4 +1,4 @@
-package dev.spence.pojos;
+package dev.spence.http.response;
 
 import lombok.Builder;
 import lombok.Data;
@@ -13,5 +13,6 @@ public class HttpResponse {
     private final int statusCode;
     private final String statusText;
     private final Map<String, String> headers;
+    private final HttpResponseBody body;
 
 }

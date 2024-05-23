@@ -1,17 +1,24 @@
 package dev.spence.http;
 
+import dev.spence.http.request.HttpPlainRequestBody;
+import dev.spence.http.request.HttpRequest;
+import dev.spence.http.request.HttpRequestBody;
+import dev.spence.pojos.HttpContentType;
 import dev.spence.pojos.HttpMethod;
-import dev.spence.pojos.HttpRequest;
-import dev.spence.pojos.HttpRequestBody;
+import dev.spence.pojos.HttpTransferEncoding;
 import dev.spence.server.Logging;
 
 import java.io.*;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 public class HttpDecoder {
 
     public static String CHUNK_ENCODING_DELIMITER = "\r\n";
     public static String CONTENT_LENGTH_HEADER_KEY = "content-length";
+    public static String CONTENT_TYPE_HEADER_KEY = "content-type";
     public static String TRANSFER_ENCODING_HEADER_KEY = "transfer-encoding";
 
     // Converts and maps byte stream data of http request to HttpRequest object and relevant fields
@@ -32,33 +39,15 @@ public class HttpDecoder {
             headers.put(splitHeader[0].toLowerCase(), splitHeader[1].trim());
         }
 
-        // Retrieve body of request
-        String bodyString = "";
-        Optional<Integer> contentLength = Optional.ofNullable(headers.get(CONTENT_LENGTH_HEADER_KEY)).map(Integer::valueOf);
+        Optional<Integer> contentLength = getContentLengthHeader(headers);
+        Optional<HttpContentType> contentType = getContentTypeHeader(headers);
+        Optional<HttpTransferEncoding> transferEncoding = getTransferEncodingHeader(headers);
 
-        if (contentLength.isPresent()) {
-            // We have a defined byte length for the body, we can convert this to the expected number of
-            // characters to be read from the stream before there is no data remaining.
-            // Assuming UTF-8 encoding, content length is 1:1 meaning 1 byte represents 1 char.
-            bodyString = readBody(reader, contentLength.get());
-        } else {
-            // Length of body is unknown as such, we support transfer of said data using chunk encoding
-            String encodingType = headers.get(TRANSFER_ENCODING_HEADER_KEY);
-            if (encodingType.equalsIgnoreCase("chunked")) {
-                bodyString = readChunkBody(reader);
-            }
-        }
-
-        HttpRequestBody body = new HttpRequestBody(bodyString);
+        // Retrieve body and http method for request
+        HttpRequestBody body = readBody(reader, contentType.orElse(null), transferEncoding.orElse(null), contentLength.orElse(null));
+        HttpMethod httpMethod = HttpMethod.getMethod(httpDetails[0]);
 
         // Create request pojo and populate values
-        HttpMethod httpMethod;
-        try {
-            httpMethod = HttpMethod.valueOf(httpDetails[0]);
-        } catch (IllegalArgumentException e) {
-            httpMethod = HttpMethod.UNKNOWN;
-        }
-
         HttpRequest request = HttpRequest.builder()
                 .method(httpMethod)
                 .uri(httpDetails[1])
@@ -71,10 +60,27 @@ public class HttpDecoder {
     }
 
     /**
-     * Reads an HTTP request body with a defined body byte length from a provided reader assuming
-     * headers and request itself have already been read.
+     * Reads and returns an HTTP request body from a provided reader and header values.
      */
-    private static String readBody(BufferedReader reader, int bodyByteLength) {
+    private static HttpRequestBody readBody(BufferedReader reader, HttpContentType contentType,
+                                            HttpTransferEncoding transferEncoding, Integer contentLength) {
+        HttpRequestBody requestBody = null;
+
+        if (contentLength != null && contentType != null) {
+            switch(contentType) {
+                case TEXT_PLAIN:
+                case APPLICATION_JSON:
+                    requestBody = readPlainBody(reader, contentLength); break;
+            }
+        }
+
+        // TODO: implement ability to read body without content length header present.
+
+        return requestBody;
+    }
+
+    // Reads an HTTP request body of plain content type into an HttpPlainRequestBody.
+    private static HttpPlainRequestBody readPlainBody(Reader reader, int bodyByteLength) {
         char[] bodyBuffer = new char[bodyByteLength];
         int totalCharsRead = 0;
 
@@ -87,19 +93,52 @@ public class HttpDecoder {
                 }
             } catch (IOException e) {
                 Logging.LOGGER.error(e.toString());
-            };
+            }
         }
 
-        return Arrays.toString(bodyBuffer);
+        return new HttpPlainRequestBody(Arrays.toString(bodyBuffer));
     }
 
-    /**
-     * Reads an HTTP request body using chunked transfer encoding from a provided reader assuming
-     * headers and request itself have already been read.
-     */
-    private static String readChunkBody(BufferedReader reader) {
-        // TODO: implement reading of body using chunked transfer encoding
-        return "";
+    private static Optional<Integer> getContentLengthHeader(Map<String, String> headers) {
+        Optional<String> rawHeaderValue = Optional.ofNullable(headers.get(CONTENT_LENGTH_HEADER_KEY));
+        int headerValue = 0;
+        if (rawHeaderValue.isPresent()) {
+            try {
+                headerValue = Integer.parseInt(rawHeaderValue.get());
+            } catch (NumberFormatException e) {
+                Logging.LOGGER.error(e.getMessage());
+            }
+        }
+
+        return Optional.of(headerValue);
+    }
+
+    private static Optional<HttpContentType> getContentTypeHeader(Map<String, String> headers) {
+        Optional<String> rawHeaderValue = Optional.ofNullable(headers.get(CONTENT_TYPE_HEADER_KEY));
+        HttpContentType headerValue = null;
+        if (rawHeaderValue.isPresent()) {
+            try {
+                headerValue = HttpContentType.getType(rawHeaderValue.get());
+            } catch (IllegalArgumentException e) {
+                Logging.LOGGER.error(e.getMessage());
+            }
+        }
+
+        return Optional.ofNullable(headerValue);
+    }
+
+    private static Optional<HttpTransferEncoding> getTransferEncodingHeader(Map<String, String> headers) {
+        Optional<String> rawHeaderValue = Optional.ofNullable(headers.get(TRANSFER_ENCODING_HEADER_KEY));
+        HttpTransferEncoding headerValue = null;
+        if (rawHeaderValue.isPresent()) {
+            try {
+                headerValue = HttpTransferEncoding.getEncoding(rawHeaderValue.get());
+            } catch (IllegalArgumentException e) {
+                Logging.LOGGER.error(e.getMessage());
+            }
+        }
+
+        return Optional.ofNullable(headerValue);
     }
 
 }

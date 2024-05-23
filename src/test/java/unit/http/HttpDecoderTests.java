@@ -2,7 +2,7 @@ package unit.http;
 
 import dev.spence.http.HttpDecoder;
 import dev.spence.pojos.HttpMethod;
-import dev.spence.pojos.HttpRequest;
+import dev.spence.http.request.HttpRequest;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
@@ -26,9 +26,9 @@ public class HttpDecoderTests {
         InputStream inputStream = new ByteArrayInputStream(requestBytes);
 
         Map<String, String> expectedHeaders = new HashMap<>();
-        expectedHeaders.put("Host", "localhost");
-        expectedHeaders.put("User-Agent", "curl/8.2.1");
-        expectedHeaders.put("Accept", "*/*");
+        expectedHeaders.put("host", "localhost");
+        expectedHeaders.put("user-agent", "curl/8.2.1");
+        expectedHeaders.put("accept", "*/*");
 
         // When
         Optional<HttpRequest> requestOptional = HttpDecoder.decode(inputStream);
