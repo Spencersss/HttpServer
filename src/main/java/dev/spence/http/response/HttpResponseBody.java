@@ -4,5 +4,6 @@ public interface HttpResponseBody {
 
     byte[] toBytes();
     String toString();
+    String getContentType();
 
 }

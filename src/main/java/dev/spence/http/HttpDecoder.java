@@ -32,6 +32,9 @@ public class HttpDecoder {
         if (rawRequest.isPresent()) {
             String[] httpDetails = rawRequest.get().split(" ");
 
+            // Retrieve query parameters if present
+            Map<String, String> queryParams = getQueryParamsFromURI(httpDetails[1]);
+
             // Retrieve headers
             Map<String, String> headers = new HashMap<>();
             String currentHeader;
@@ -54,6 +57,7 @@ public class HttpDecoder {
                     .method(httpMethod)
                     .uri(httpDetails[1])
                     .protocol(httpDetails[2])
+                    .queryParams(queryParams)
                     .headers(headers)
                     .body(body)
                     .build();
@@ -130,6 +134,28 @@ public class HttpDecoder {
         }
 
         return new HttpPlainRequestBody(Arrays.toString(bodyBuffer));
+    }
+
+    /**
+     * Parses the query params belonging to the provided URI if present
+     *
+     * @param uri String representation of full URI
+     * @return Map containing a query param name to its corresponding query param value
+     */
+    private static Map<String, String> getQueryParamsFromURI(String uri) {
+        Map<String, String> queryParams = new HashMap<>();
+
+        if (uri.contains("?")) {
+            String uriSplit = uri.split("\\?")[1];
+            String[] rawQueryParams = uriSplit.split("&");
+
+            for (String rawQueryParam : rawQueryParams) {
+                String[] paramSplit = rawQueryParam.split("=");
+                queryParams.put(paramSplit[0], paramSplit[1]);
+            }
+        }
+
+        return queryParams;
     }
 
 }

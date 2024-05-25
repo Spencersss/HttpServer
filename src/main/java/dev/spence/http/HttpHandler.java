@@ -57,7 +57,7 @@ public class HttpHandler {
         inputStream.close();
         outputStream.close();
 
-        Logging.LOGGER.info("Response sent!");
+        Logging.LOGGER.info(String.format("Response sent to %s", connection.getInetAddress().getHostAddress()));
     }
 
 }

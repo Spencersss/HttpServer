@@ -15,6 +15,7 @@ public class HttpRequest {
     private final HttpMethod method;
     private final String uri;
     private final String protocol;
+    private final Map<String, String> queryParams;
     private final Map<String, String> headers;
     private final HttpRequestBody body;
 
