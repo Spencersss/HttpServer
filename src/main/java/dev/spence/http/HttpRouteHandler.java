@@ -1,9 +1,11 @@
 package dev.spence.http;
 
+import dev.spence.http.request.HttpRequest;
 import dev.spence.http.response.HttpResponse;
 
-public interface HttpRouteHandler<T> {
+@FunctionalInterface
+public interface HttpRouteHandler {
 
-    HttpResponse handle(T request, Object... params);
+    HttpResponse handle(HttpRequest request, Object... params);
 
 }

@@ -2,7 +2,6 @@ package dev.spence.server;
 
 import dev.spence.http.HttpHandler;
 import dev.spence.http.HttpRouteHandler;
-import dev.spence.http.request.HttpRequest;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -15,7 +14,7 @@ import java.util.concurrent.Executors;
 public class HttpServer {
 
     // Vars
-    private final Map<String, HttpRouteHandler<HttpRequest>> routes = new HashMap<>();
+    private final Map<String, HttpRouteHandler> routes = new HashMap<>();
     private final ExecutorService executor;
     private final ServerSocket socket;
     private HttpHandler httpHandler;
@@ -50,7 +49,23 @@ public class HttpServer {
 
     }
 
-    // Creates a single thread for handling an individual socket connection (and request being sent along)
+    /**
+     * Adds a new route and associated route handler if it does not exist to our enabled list of routes.
+     *
+     * @param route String value of our route.
+     * @param routeHandler HttpRouteHandler that will handle incoming requests to the established route.
+     */
+    public void addRoute(String route, HttpRouteHandler routeHandler) {
+        if (!this.routes.containsKey(route)) {
+            this.routes.put(route, routeHandler);
+        }
+    }
+
+    /**
+     * Creates a single pooled thread for handling an individual socket connection by the http handler.
+     *
+     * @param incomingConnection Socket connection containing expected http request.
+     */
     private void handleIncomingConnection(Socket incomingConnection) {
         executor.execute(() -> {
             try {

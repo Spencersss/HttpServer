@@ -13,10 +13,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 public class HttpDecoder {
 
-    public static String CHUNK_ENCODING_DELIMITER = "\r\n";
     public static String CONTENT_LENGTH_HEADER_KEY = "content-length";
     public static String CONTENT_TYPE_HEADER_KEY = "content-type";
     public static String TRANSFER_ENCODING_HEADER_KEY = "transfer-encoding";
@@ -27,36 +27,64 @@ public class HttpDecoder {
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 
         // Retrieve http details including http method, uri, and http protocol used
-        String rawRequest = reader.readLine();
-        String[] httpDetails = rawRequest.split(" ");
+        Optional<String> rawRequest = Optional.ofNullable(reader.readLine());
 
-        // Retrieve headers
-        Map<String, String> headers = new HashMap<>();
-        String currentHeader;
-        while ((currentHeader = reader.readLine()) != null && !currentHeader.isEmpty()) {
-            // Split header name and value on ':' and add to map of header name(s) -> values.
-            String[] splitHeader = currentHeader.split(":");
-            headers.put(splitHeader[0].toLowerCase(), splitHeader[1].trim());
+        if (rawRequest.isPresent()) {
+            String[] httpDetails = rawRequest.get().split(" ");
+
+            // Retrieve headers
+            Map<String, String> headers = new HashMap<>();
+            String currentHeader;
+            while ((currentHeader = reader.readLine()) != null && !currentHeader.isEmpty()) {
+                // Split header name and value on ':' and add to map of header name(s) -> values.
+                String[] splitHeader = currentHeader.split(":");
+                headers.put(splitHeader[0].toLowerCase(), splitHeader[1].trim());
+            }
+
+            Optional<Integer> contentLength = getHeader(headers, CONTENT_LENGTH_HEADER_KEY, Integer::valueOf);
+            Optional<HttpContentType> contentType = getHeader(headers, CONTENT_TYPE_HEADER_KEY, HttpContentType::valueOf);
+            Optional<HttpTransferEncoding> transferEncoding = getHeader(headers, TRANSFER_ENCODING_HEADER_KEY, HttpTransferEncoding::valueOf);
+
+            // Retrieve body and http method for request
+            HttpRequestBody body = readBody(reader, contentType.orElse(null), transferEncoding.orElse(null), contentLength.orElse(null));
+            HttpMethod httpMethod = HttpMethod.getMethod(httpDetails[0]);
+
+            // Create request pojo and populate values
+            HttpRequest request = HttpRequest.builder()
+                    .method(httpMethod)
+                    .uri(httpDetails[1])
+                    .protocol(httpDetails[2])
+                    .headers(headers)
+                    .body(body)
+                    .build();
+
+            return Optional.of(request);
         }
 
-        Optional<Integer> contentLength = getContentLengthHeader(headers);
-        Optional<HttpContentType> contentType = getContentTypeHeader(headers);
-        Optional<HttpTransferEncoding> transferEncoding = getTransferEncodingHeader(headers);
+        return Optional.empty();
+    }
 
-        // Retrieve body and http method for request
-        HttpRequestBody body = readBody(reader, contentType.orElse(null), transferEncoding.orElse(null), contentLength.orElse(null));
-        HttpMethod httpMethod = HttpMethod.getMethod(httpDetails[0]);
+    /**
+     * Retrieves an optional containing the retrieved header value if present using the provided headerKey.
+     *
+     * @param headers Map of header key to values.
+     * @param headerKey String of header key.
+     * @param valueOfFunc Function to convert the retrieved string header value to a specific data type;
+     * @return Optional containing either the retrieved value or empty if not.
+     * @param <T> Generic value representing the converted type of the retrieved header value.
+     */
+    public static <T> Optional<T> getHeader(Map<String, String> headers, String headerKey, Function<String, T> valueOfFunc) {
+        Optional<String> rawHeaderValue = Optional.ofNullable(headers.get(headerKey));
+        if (!rawHeaderValue.isPresent()) {
+            return Optional.empty();
+        }
 
-        // Create request pojo and populate values
-        HttpRequest request = HttpRequest.builder()
-                .method(httpMethod)
-                .uri(httpDetails[1])
-                .protocol(httpDetails[2])
-                .headers(headers)
-                .body(body)
-                .build();
-
-        return Optional.of(request);
+        try {
+            return Optional.ofNullable(valueOfFunc.apply(rawHeaderValue.get()));
+        } catch (RuntimeException e) {
+            Logging.LOGGER.error(e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**
@@ -67,11 +95,8 @@ public class HttpDecoder {
         HttpRequestBody requestBody = null;
 
         if (contentLength != null && contentType != null) {
-            switch(contentType) {
-                case TEXT_PLAIN:
-                case APPLICATION_JSON:
-                    requestBody = readPlainBody(reader, contentLength); break;
-            }
+            // TODO: add support for additional content types
+            requestBody = readPlainBody(reader, contentLength);
         }
 
         // TODO: implement ability to read body without content length header present.
@@ -80,6 +105,14 @@ public class HttpDecoder {
     }
 
     // Reads an HTTP request body of plain content type into an HttpPlainRequestBody.
+
+    /**
+     * Reads an HTTP request body of plain content type into an HttpPlainRequestBody.
+     *
+     * @param reader Reader containing the raw byte data of the http request being read.
+     * @param bodyByteLength Integer representing the length in bytes of the request body.
+     * @return HttpPlainRequestBody containing the string representation of the request's data.
+     */
     private static HttpPlainRequestBody readPlainBody(Reader reader, int bodyByteLength) {
         char[] bodyBuffer = new char[bodyByteLength];
         int totalCharsRead = 0;
@@ -97,48 +130,6 @@ public class HttpDecoder {
         }
 
         return new HttpPlainRequestBody(Arrays.toString(bodyBuffer));
-    }
-
-    private static Optional<Integer> getContentLengthHeader(Map<String, String> headers) {
-        Optional<String> rawHeaderValue = Optional.ofNullable(headers.get(CONTENT_LENGTH_HEADER_KEY));
-        int headerValue = 0;
-        if (rawHeaderValue.isPresent()) {
-            try {
-                headerValue = Integer.parseInt(rawHeaderValue.get());
-            } catch (NumberFormatException e) {
-                Logging.LOGGER.error(e.getMessage());
-            }
-        }
-
-        return Optional.of(headerValue);
-    }
-
-    private static Optional<HttpContentType> getContentTypeHeader(Map<String, String> headers) {
-        Optional<String> rawHeaderValue = Optional.ofNullable(headers.get(CONTENT_TYPE_HEADER_KEY));
-        HttpContentType headerValue = null;
-        if (rawHeaderValue.isPresent()) {
-            try {
-                headerValue = HttpContentType.getType(rawHeaderValue.get());
-            } catch (IllegalArgumentException e) {
-                Logging.LOGGER.error(e.getMessage());
-            }
-        }
-
-        return Optional.ofNullable(headerValue);
-    }
-
-    private static Optional<HttpTransferEncoding> getTransferEncodingHeader(Map<String, String> headers) {
-        Optional<String> rawHeaderValue = Optional.ofNullable(headers.get(TRANSFER_ENCODING_HEADER_KEY));
-        HttpTransferEncoding headerValue = null;
-        if (rawHeaderValue.isPresent()) {
-            try {
-                headerValue = HttpTransferEncoding.getEncoding(rawHeaderValue.get());
-            } catch (IllegalArgumentException e) {
-                Logging.LOGGER.error(e.getMessage());
-            }
-        }
-
-        return Optional.ofNullable(headerValue);
     }
 
 }
